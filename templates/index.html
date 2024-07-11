@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script>
+        // 해당 월(month)의 일(day)수를 반환
+        function getDaysInMonth(year, month) {
+            return new Date(year, month + 1, 0).getDate(); // month+1(**다음달**),  day매개변수 0대입해서 전 달의 **마지막 일**을 반환
+        }
+    </script>
+</head>
+
+<body>
+    <h1>최혁 펀드</h1>
+    <div>이달 누적 수익액: <span id="totalProceedsSum">0</span></div>
+    <canvas id="myChart" width="350" height="120"></canvas>
+    <script>
+        function processData(data) {
+            const labels = [];  // date
+            const dayProceeds = [];
+            const totalProceeds = [];
+            let hasTotalProceedsData = false; // db 의 total_proceeds 데이터 존재여부
+            let totalDayProceedsSum = 0; // 누적 총액 담을 변수
+        
+            const currentDate = new Date(data[0].insert_date);
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = getDaysInMonth(year, (month + 1));
+        
+            for (let day = 1; day <= daysInMonth; day++) {
+                const utcDate = new Date(Date.UTC(year, month, day)); // 서버, 로컬 간에 시간이 달라 그래프의 x축이 밀리는 현상이 일어나서 utc로 통일 
+                const dateString = utcDate.toISOString().split('T')[0]; // ISO 포맷의 문자열("yyyy-mm-ddT00:00:00.000Z") 에서 T를 기준으로 날짜정보만 추출
+                labels.push(dateString);
+        
+                const dayData = data.find(entry => {
+                    const entryDate = new Date(entry.insert_date);
+                    entryDate.setMinutes(entryDate.getMinutes() - entryDate.getTimezoneOffset()); 
+                    const entryDateString = entryDate.toISOString().split('T')[0];
+                    return entryDateString === dateString;
+                });
+        
+                if (dayData) {
+                    dayProceeds.push(dayData.day_proceeds);
+                    totalDayProceedsSum += parseInt(dayData.day_proceeds); // 누적총액 합산
+                    if (dayData.total_proceeds !== null) { // total proceeds가 존재하면 데이터추가 and 데이터셋을 만들기 위한 true 반환
+                        totalProceeds.push(dayData.total_proceeds);
+                        hasTotalProceedsData = true;
+                    } else {
+                        totalProceeds.push(null); // total_proceeds 데이터가 없으면 null을 추가
+                    }
+                } else {
+                    dayProceeds.push(0);
+                    totalProceeds.push(null); // 데이터가 없는 날도 null 처리
+                }
+            }
+        
+            return { labels, dayProceeds, totalProceeds, hasTotalProceedsData, totalDayProceedsSum };
+        }
+        
+        function configureChartData(labels, dayProceeds, totalProceeds, hasTotalProceedsData) {
+            const datasets = [{
+                label: 'Day Proceeds',
+                data: dayProceeds,
+                yAxisID: 'y-left',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }];
+        
+            if (hasTotalProceedsData) {
+                datasets.push({
+                    label: 'Total Proceeds',
+                    data: totalProceeds,
+                    yAxisID: 'y-right',
+                    type: 'line',
+                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    borderWidth: 1
+                });
+            }
+        
+            return { labels, datasets };
+        }
+        
+        function createChart(data) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            const myChart = new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: {
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {}
+                        },
+                        'y-left': {
+                            type: 'linear',
+                            position: 'left',
+                            title: {
+                                display: true,
+                            }
+                        },
+                        'y-right': {
+                            type: 'linear',
+                            position: 'right',
+                            title: {
+                                display: true,
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        fetch('/data')
+            .then(response => response.json())
+            .then(data => {
+                const processedData = processData(data);
+                const chartData = configureChartData(processedData.labels, processedData.dayProceeds, processedData.totalProceeds, processedData.hasTotalProceedsData);
+                createChart(chartData);
+                document.getElementById("totalProceedsSum").innerText = processedData.totalDayProceedsSum.toLocaleString();
+            });
+        
+
+    </script>
+</body>
+
+</html>
