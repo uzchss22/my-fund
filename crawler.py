@@ -19,8 +19,8 @@ def crawling_data():
 
     driver.get('fund-url') # insert your fund url
 
-    unprocessed_total_proceeds = driver.find_element(By.XPATH, 'total-preceeds-path').text  # insert your XPath
-    unprocessed_day_proceeds = driver.find_element(By.XPATH, 'day-proceeds-path').text # insert your XPath
+    unprocessed_total_proceeds = driver.find_element(By.XPATH, 'total-preceeds-path').text  # insert XPath
+    unprocessed_day_proceeds = driver.find_element(By.XPATH, 'day-proceeds-path').text # insert XPath
     driver.quit()
     total_proceeds = _string_to_int(unprocessed_total_proceeds)
     day_proceeds = _string_to_int(unprocessed_day_proceeds)
